@@ -1,0 +1,35 @@
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include "html.h"
+#include <WebServer.h>
+#include <ESPmDNS.h>
+
+WebServer server(80);
+
+const char* ssid = "SeSAC Gangnam";
+const char* password = "sesac01234";
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi connected!");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", []() {
+    server.send(200, "text/html", "<h1>Hello from ESP32!</h1>");
+  });
+
+  server.begin();
+}
+
+void loop() {
+  server.handleClient();
+}
