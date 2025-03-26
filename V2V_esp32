@@ -1,0 +1,89 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+HardwareSerial MySerial(1);
+const int speakerPin = 25;  // 스피커 연결 핀 (예시)
+
+const char* ssid = "SeSAC GANGNAM";
+const char* password = "sesac01234";
+const char* host = "192.168.100.181";  // 서버 IP 주소
+const uint16_t port = 8000;
+
+void setup() {
+  Serial.begin(115200);
+  MySerial.begin(9600, SERIAL_8N1, 16, 17);
+  
+  pinMode(speakerPin, OUTPUT);  // 스피커 핀 설정
+
+  WiFi.begin(ssid, password);
+  Serial.print("[CLIENT] Wi-Fi 연결 중");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.print(".");
+    Serial.print(" 상태코드: ");
+    Serial.println(WiFi.status());
+  }
+  Serial.println("\n[CLIENT] 연결 성공!");
+}
+
+void loop() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin("http://192.168.100.181:8000/sensor/get-latest-data/");  // GET 요청으로 최신 데이터 가져오기
+
+    int httpCode = http.GET();
+
+    if (httpCode > 0) {
+      String payload = http.getString();
+
+      Serial.println("[CLIENT] JSON 응답 본문:");
+      Serial.println(payload);
+
+      // JSON 파싱
+      StaticJsonDocument<256> doc;
+      DeserializationError error = deserializeJson(doc, payload);
+
+      if (error) {
+        Serial.print("[CLIENT] JSON 파싱 실패: ");
+        Serial.println(error.f_str());
+      } else {
+        const char* status = doc["status"];
+        const char* device = doc["device"];
+        float gyro = doc["gyro"];
+        bool isDrunkDriving = doc["is_drunk_driving"];  // 서버에서 판단한 음주운전 상태
+
+        Serial.print("[CLIENT] 파싱 성공! status: ");
+        Serial.println(status);
+        Serial.print("device: ");
+        Serial.println(device);
+        Serial.print("gyro: ");
+        Serial.println(gyro);
+        Serial.print("isDrunkDriving: ");
+        Serial.println(isDrunkDriving);
+        //playAlertSound();
+        // 음주운전 상태에 따라 스피커 출력
+        if (isDrunkDriving) {
+          playAlertSound();  // 알림 소리 재생 함수 호출
+        }
+      }
+    } else {
+      Serial.print("[CLIENT] HTTP 요청 실패, 코드: ");
+      Serial.println(httpCode);
+    }
+
+    http.end();
+  } else {
+    Serial.println("[CLIENT] Wi-Fi 연결 끊김");
+  }
+  
+  delay(10000);  // 10초 대기
+}
+
+void playAlertSound() {
+  Serial.println("[CLIENT] ALERT 상태 - STM32에 전송");
+  MySerial.write('A');  
+}
+
+
